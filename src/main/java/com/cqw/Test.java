@@ -6,7 +6,7 @@ import com.spring.CqwApplicationContext;
 
 public class Test {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IllegalAccessException {
 
         CqwApplicationContext cqwApplicationContext =
                 new CqwApplicationContext(AppConfig.class);

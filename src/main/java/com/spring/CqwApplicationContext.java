@@ -28,7 +28,7 @@ public class CqwApplicationContext {
 
 
 
-     public CqwApplicationContext(Class configClass){
+     public CqwApplicationContext(Class configClass) throws IllegalAccessException {
 
          //总结思路：1.通过配置类获取上面的注解，通过注解获取想要扫描的类路径
 //        2.使用application类加载器加载类 类路径下的文件
@@ -46,6 +46,7 @@ public class CqwApplicationContext {
          //对单例bean生成bean对象
          //从beanDefinitionmap对象中获取beandefinition对象，判断对象是否为singleton
          // ，然后创建对象，放入singletonmap中
+         //
          for(Map.Entry<String,BeanDefinition> entry:
                  beanDefinitionMap.entrySet()){
              BeanDefinition beanDefinition=entry.getValue();
@@ -55,6 +56,9 @@ public class CqwApplicationContext {
                  singletonObjects.put(beanName,bean);
              }
          }
+
+         doDI();
+
 
 
 
@@ -68,21 +72,7 @@ public class CqwApplicationContext {
              //调用class对象来调用无参构造方法生成对象
              Object instance = clazz.getDeclaredConstructor().newInstance();
 
-             //依赖注入
-             for(Field declaredField:clazz.getDeclaredFields()){
 
-                 if(declaredField.isAnnotationPresent(Autowired.class)){
-                     //直接byName了 直接从singletonMap中获取了 对于prototype对象直接创建
-                     // ？？？（如果获取的时候singletonMap还没有呢？）
-                     Object bean = getBean(declaredField.getName());
-                     //如果单例池中没有并且required为true，则抛出异常
-                     if(bean==null&&declaredField.getDeclaredAnnotation(Autowired.class).required()){
-                         throw  new NullPointerException();
-                     }
-                     declaredField.setAccessible(true);
-                     declaredField.set(instance,bean);
-                 }
-             }
              //Aware回调：对于实现BeanNameAware接口的类，将其beanName传递给对象
              if(instance instanceof BeanNameAware){
                  ((BeanNameAware)instance).setBeanName(beanName);
@@ -129,8 +119,30 @@ public class CqwApplicationContext {
          return null;
 
      }
+    //依赖注入:遍历singletonMap，取出对象，判断对象Field上是否有@AutoWired注解，如果有从getBean中获取对象添加进去
+    private void doDI() throws IllegalAccessException {
+          System.out.println("开始依赖注入。。。。。");
+         for(Object instance:singletonObjects.values()){
+             Class clazz = instance.getClass();
+             for(Field declaredField: clazz.getDeclaredFields()){
 
-     //执行AOP
+                 if(declaredField.isAnnotationPresent(Autowired.class)){
+                     //直接byName了 直接从singletonMap中获取了 对于prototype对象直接创建
+                     // ？？？（如果获取的时候singletonMap还没有呢？）
+                     Object bean = getBean(declaredField.getName());
+                     //如果单例池中没有并且required为true，则抛出异常
+                     if(bean==null&&declaredField.getDeclaredAnnotation(Autowired.class).required()){
+                         throw  new NullPointerException();
+                     }
+                     declaredField.setAccessible(true);
+                     declaredField.set(instance,bean);
+                 }
+             }
+         }
+
+    }
+
+    //执行AOP
      private  void doAOP (){
 
          if(aopClassSet.size()>0){
