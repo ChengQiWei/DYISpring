@@ -23,6 +23,8 @@ public class CqwApplicationContext {
 
     //CopyOnWriteArraySet是线程安全的
     private Set<Class<?>> aopClassSet =new CopyOnWriteArraySet<>();
+    
+    private Set<Class<?>> proxyClassSet=new CopyOnWriteArraySet<>();
 
 
 
@@ -57,7 +59,10 @@ public class CqwApplicationContext {
              }
          }
 
+         doAOP();
          doDI();
+
+
 
 
 
@@ -123,23 +128,30 @@ public class CqwApplicationContext {
     private void doDI() throws IllegalAccessException {
           System.out.println("开始依赖注入。。。。。");
          for(Object instance:singletonObjects.values()){
-             Class clazz = instance.getClass();
-             for(Field declaredField: clazz.getDeclaredFields()){
+             if(!proxyClassSet.contains(instance.getClass())){
+                 doDIbyObject(instance);}
 
-                 if(declaredField.isAnnotationPresent(Autowired.class)){
-                     //直接byName了 直接从singletonMap中获取了 对于prototype对象直接创建
-                     // ？？？（如果获取的时候singletonMap还没有呢？）
-                     Object bean = getBean(declaredField.getName());
-                     //如果单例池中没有并且required为true，则抛出异常
-                     if(bean==null&&declaredField.getDeclaredAnnotation(Autowired.class).required()){
-                         throw  new NullPointerException();
-                     }
-                     declaredField.setAccessible(true);
-                     declaredField.set(instance,bean);
-                 }
-             }
          }
 
+    }
+
+    //根据对象进行依赖注入
+    private void doDIbyObject(Object instance) throws IllegalAccessException {
+        Class clazz = instance.getClass();
+        for(Field declaredField: clazz.getDeclaredFields()){
+
+            if(declaredField.isAnnotationPresent(Autowired.class)){
+                //直接byName了 直接从singletonMap中获取了 对于prototype对象直接创建
+                // ？？？（如果获取的时候singletonMap还没有呢？）
+                Object bean = getBean(declaredField.getName());
+                //如果单例池中没有并且required为true，则抛出异常
+                if(bean==null&&declaredField.getDeclaredAnnotation(Autowired.class).required()){
+                    throw  new NullPointerException();
+                }
+                declaredField.setAccessible(true);
+                declaredField.set(instance,bean);
+            }
+        }
     }
 
     //执行AOP
@@ -162,21 +174,29 @@ public class CqwApplicationContext {
                              String methodName =
                                      execution.substring(execution.lastIndexOf(".") + 1);
                              try {
+
+                                 //获取要代理的目标类
                                  Class<?> targetClass = Class.forName(fullName);
+                                 //将要动态代理类加入Set中
+                                 proxyClassSet.add(targetClass);
                                  //获取要代理类的目标对象，从ioc容器中获取,通过类名获取默认的名字
                                  String simpleName = targetClass.getSimpleName();
                                  String beanName=
                                          String.valueOf(simpleName.charAt(0)).toLowerCase()+simpleName.substring(1);
                                  Object bean=getBean(beanName);
+                                 //为了之后依赖注入时，使用代理类注入，导致注入不成功，对于要动态代理的类首先进行一遍依赖注入，并加入map集合中；
+                                 doDIbyObject(bean);
+
                                  JdkProxy<Object> beanProxy =
                                          new JdkProxy<Object>(targetClass, methodName,
                                          bean, method, aop);
+                                 Object proxyInstance = beanProxy.getProxyInstance();
+
 
                                  //将bean代理类放回到容器中，判断如何是singleton的话放回去
                                  if(beanDefinitionMap.get(beanName).getScope()=="singleton"){
-                                     singletonObjects.put(beanName,beanProxy);
+                                     singletonObjects.put(beanName,proxyInstance);
                                  }
-
 
 
                              } catch (Exception e) {

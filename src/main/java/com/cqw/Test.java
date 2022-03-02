@@ -11,10 +11,16 @@ public class Test {
         CqwApplicationContext cqwApplicationContext =
                 new CqwApplicationContext(AppConfig.class);
 
-        UserService userService=(UserService)cqwApplicationContext.getBean(
-                "userService");
+        UserService userServiceImpl=(UserService)cqwApplicationContext.getBean(
+                "userServiceImpl");
 
-        userService.test();
+        userServiceImpl.test();
+        userServiceImpl.getOrderServiceImpl().order();
+
+        OrderService orderServiceImpl=(OrderService)cqwApplicationContext.getBean(
+                "orderServiceImpl");
+
+        orderServiceImpl.order();
 
 
     }

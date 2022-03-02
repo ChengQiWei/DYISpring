@@ -6,5 +6,5 @@ import com.spring.Component;
 @Component("weService")
 public class WeService {
     @Autowired
-    private UserService userService;
+    private UserService userServiceImpl;
 }

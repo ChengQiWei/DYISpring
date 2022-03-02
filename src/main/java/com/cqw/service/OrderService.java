@@ -1,13 +1,5 @@
 package com.cqw.service;
 
-
-import com.spring.Autowired;
-import com.spring.Component;
-
-@Component("orderService")
-public class OrderService {
-
-
-
-
+public interface OrderService {
+    public  void order();
 }
