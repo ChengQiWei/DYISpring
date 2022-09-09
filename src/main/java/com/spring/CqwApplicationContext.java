@@ -58,14 +58,9 @@ public class CqwApplicationContext {
                  singletonObjects.put(beanName,bean);
              }
          }
-
+         doTrans();
          doAOP();
          doDI();
-
-
-
-
-
 
      }
 
@@ -75,6 +70,7 @@ public class CqwApplicationContext {
          Class clazz = beanDefinition.getClazz();
          try {
              //调用class对象来调用无参构造方法生成对象
+             //Todo 如果没有无参构造方法，只有有参构造方法？？
              Object instance = clazz.getDeclaredConstructor().newInstance();
 
 
@@ -82,6 +78,7 @@ public class CqwApplicationContext {
              if(instance instanceof BeanNameAware){
                  ((BeanNameAware)instance).setBeanName(beanName);
              }
+
 
              //在初始化前调用BeanPostProcessor，执行里面的代码
              //至于执行顺序，源码中有响应的功能可以自定义；因为不同文件系统的存储文件顺序可能不同，因此按照文件扫码顺序来判断beanpostProcessor的执行顺序是不可靠的
@@ -108,7 +105,25 @@ public class CqwApplicationContext {
                          beanName);
              }
 
-
+//             //对于需要执行事务的类进行动态代理
+//             //遍历类的方法
+//             Method[] declaredMethods = clazz.getDeclaredMethods();
+//             //存储需要执行事务的方法的名字
+//             List<String> transactionalMethod =new ArrayList<>();
+//             if(declaredMethods!=null){
+//                 //遍历方法，获取被@Transactional注解修饰的方法名字，存储
+//                 for(Method declaredMethod:declaredMethods){
+//
+//                     if(declaredMethod.isAnnotationPresent(Transactional.class)){
+//                         transactionalMethod.add(declaredMethod.getName());
+//                     }
+//                 }
+//             }
+//             //如果有被修饰的方法，则生成代理对象
+//             if(transactionalMethod.size()>0){
+//                 CglibProxy cglibProxy = new CglibProxy(clazz, transactionalMethod);
+//                 instance= cglibProxy.getCglibProxy();
+//             }
 
 
              return instance;
@@ -154,6 +169,50 @@ public class CqwApplicationContext {
         }
     }
 
+    //执行事务
+    private void doTrans(){
+
+         //遍历单例池
+        for(Map.Entry<String,Object> entry: singletonObjects.entrySet()){
+            String beanName=entry.getKey();
+            Object instance=entry.getValue();
+            Class clazz= instance.getClass();
+            //对于需要执行事务的类进行动态代理
+            //遍历类的方法
+            Method[] declaredMethods = clazz.getDeclaredMethods();
+            //存储需要执行事务的方法的名字
+            List<String> transactionalMethod =new ArrayList<>();
+            if(declaredMethods!=null){
+                //遍历方法，获取被@Transactional注解修饰的方法名字，存储
+                for(Method declaredMethod:declaredMethods){
+
+                    if(declaredMethod.isAnnotationPresent(Transactional.class)){
+                        transactionalMethod.add(declaredMethod.getName());
+                    }
+                }
+            }
+            //如果有被修饰的方法，则生成代理对象
+            if(transactionalMethod.size()>0){
+                //先进行一下依赖注入
+                try {
+                    proxyClassSet.add(clazz);
+                    doDIbyObject(instance);
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                }
+                TransProxy transProxy = new TransProxy(clazz,
+                        instance, transactionalMethod);
+                instance= transProxy.getProxyInstance();
+                if(beanDefinitionMap.get(beanName).getScope()=="singleton"){
+                    singletonObjects.put(beanName,instance);
+                }
+            }
+            else{
+                continue;
+            }
+        }
+    }
+
     //执行AOP
      private  void doAOP (){
 
@@ -167,6 +226,7 @@ public class CqwApplicationContext {
                              Around annotation = method.getAnnotation(Around.class);
                              //切入点表达式
                              String execution = annotation.execution();
+                             //Todo 正则表达式的解析
                              //获取要代理类的全限列名
                              String fullName = execution.substring(0,
                                      execution.lastIndexOf("."));
@@ -177,7 +237,7 @@ public class CqwApplicationContext {
 
                                  //获取要代理的目标类
                                  Class<?> targetClass = Class.forName(fullName);
-                                 //将要动态代理类加入Set中
+                                 //将要动态代理类加入Set中,以后判断类如果存在set当中的话，不用依赖注入了
                                  proxyClassSet.add(targetClass);
                                  //获取要代理类的目标对象，从ioc容器中获取,通过类名获取默认的名字
                                  String simpleName = targetClass.getSimpleName();
@@ -185,6 +245,7 @@ public class CqwApplicationContext {
                                          String.valueOf(simpleName.charAt(0)).toLowerCase()+simpleName.substring(1);
                                  Object bean=getBean(beanName);
                                  //为了之后依赖注入时，使用代理类注入，导致注入不成功，对于要动态代理的类首先进行一遍依赖注入，并加入map集合中；
+                                //如果此时依赖注入，注入的还是普通对象，也就是这个普通对象还没轮到生成代理类？？
                                  doDIbyObject(bean);
 
                                  JdkProxy<Object> beanProxy =
@@ -255,14 +316,18 @@ public class CqwApplicationContext {
                                 BeanPostProcessor instance =
                                         (BeanPostProcessor) clazz.getDeclaredConstructor().newInstance();
                                 beanPostProcessorList.add(instance);
+                                continue;
 
                             }
 
-                            //获取到实现aop的类,将其加入set中，直接continue，不加入Beandefinition中了
+                            //获取到实现aop的类,
+                            // 将其加入set中，直接continue，不加入Beandefinition中了,
+                            // 也对象就是不加入singletonMap中了
                             if(clazz.isAnnotationPresent(Aspect.class)){
                                 aopClassSet.add(clazz);
                                 continue;
                             }
+
                             
 
                             //表示这个类是一个bean
@@ -312,7 +377,7 @@ public class CqwApplicationContext {
                  //创建Bean对象
                  //从beandifinitionmap中获取beandefinition对象，创建bean
                  Object bean = createBean(beanName,
-                         beanDefinitionMap.get(beanName));
+                         beanDefinition);
                  return  bean;
 
              }

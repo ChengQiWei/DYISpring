@@ -3,11 +3,11 @@ package com.cqw.service;
 
 import com.spring.*;
 
-@Component("userServiceImpl")
+//@Component("userServiceImpl")
 public class UserServiceImpl implements BeanNameAware, InitializingBean ,UserService{
 
-     @Autowired
-     private OrderService orderServiceImpl;
+//     @Autowired
+//     private OrderService orderServiceImpl;
 
      private String beanName;
 
@@ -23,11 +23,17 @@ public class UserServiceImpl implements BeanNameAware, InitializingBean ,UserSer
 
     @Override
     public  void test(){
-         System.out.println(orderServiceImpl);
-         System.out.println(beanName);
+//         System.out.println(orderServiceImpl);
+//         System.out.println(beanName);
+//        orderServiceImpl.tranfer();
+//        orderServiceImpl.test();
+        System.out.println("userServiceImpel" +
+                "'s test");
      }
 
-    public OrderService getOrderServiceImpl() {
-        return orderServiceImpl;
-    }
+
+
+//    public OrderService getOrderServiceImpl() {
+//        return orderServiceImpl;
+//    }
 }

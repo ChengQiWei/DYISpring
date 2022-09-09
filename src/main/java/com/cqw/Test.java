@@ -11,16 +11,20 @@ public class Test {
         CqwApplicationContext cqwApplicationContext =
                 new CqwApplicationContext(AppConfig.class);
 
-        UserService userServiceImpl=(UserService)cqwApplicationContext.getBean(
-                "userServiceImpl");
-
-        userServiceImpl.test();
-        userServiceImpl.getOrderServiceImpl().order();
-
-        OrderService orderServiceImpl=(OrderService)cqwApplicationContext.getBean(
+//        UserService userServiceImpl=(UserService)cqwApplicationContext.getBean(
+//                "userServiceImpl");
+        OrderService orderServiceImpl=
+                (OrderService)cqwApplicationContext.getBean(
                 "orderServiceImpl");
 
-        orderServiceImpl.order();
+        orderServiceImpl.tranfer();
+//        userServiceImpl.getOrderServiceImpl().order();
+
+//        UserService userServiceImpl=
+//                (UserService)cqwApplicationContext.getBean(
+//                "userServiceImpl");
+
+//        orderServiceImpl.tranfer();
 
 
     }
